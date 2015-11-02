@@ -1,4 +1,9 @@
 
+// Code to run to produce a counter on an fpga board. Interrupts for button pressing to implement
+// stop, start and pause in progress.
+
+
+
 
 /***************************** Include Files *******************************/
 #include "sevenSeg.h"
@@ -18,15 +23,26 @@
  *
  */
 
+
+int milisec = 0;
+int sec = 0;
+int sectwo = 0;
+int secthree = 0;
+int secfour = 0;
+XGpio btnPress;
+XGpio Gpio;
 void milidetector(int miliseconds);
 void secondDetector(int seconds);
-void allMightyDetector(int miliseconds, int seconds, int sectwo);
+void allMightyDetector(int miliseconds, int seconds, int sectwo, int secthree, int secfour);
+void milisecDetector(int miliseconds);
+void secondDetector(int seconds);
+void IntrHandler(void *baseaddr_p);
+void reset();
 int main()
 {
-	int milisec = 0;
-	int sec = 0;
-	int sectwo = 0;
-	extra_method();
+
+	microblaze_register_handler((XInterruptHandler)IntrHandler, (void *)0);
+	//extra_method();
 
 	XTmrCtr_SetControlStatusReg(XPAR_TMRCTR_0_BASEADDR, 1, 0);
 	XTmrCtr_SetLoadReg(XPAR_TMRCTR_0_BASEADDR, 1, 0);
@@ -49,70 +65,157 @@ int main()
 		//xil_printf("\t%d \n", numClockCycles);
 		int numClockCycles = XTmrCtr_GetTimerCounterReg(XPAR_TMRCTR_0_BASEADDR, 1);
 		//xil_printf("\t%d \n", numClockCycles);
+		//secondDetector(sec);
+		//milisecDetector(milisec);
+		SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111110001000000);
+		allMightyDetector(milisec, sec, sectwo, secthree, secfour);
+		//xil_printf("%d\n",numClockCycles);
+		if(numClockCycles >= 20000000){
 
 
-		if(numClockCycles >= 5000000){
-
-			//milisec++;
-			if(milisec == 10){
-
-				milisec = 0;
-				sec++;
-				allMightyDetector(milisec, sec, sectwo);
-
-			}
-			if(sec == 10){
-
-				sectwo++;
-				sec = 0;
-				allMightyDetector(milisec, sec, sectwo);
-
-			}
-			else{
-
-				allMightyDetector(milisec, sec, sectwo);
 				milisec++;
-				//SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1000000001000000);
 
+					XTmrCtr_SetControlStatusReg(XPAR_TMRCTR_0_BASEADDR, 1, 0);
+					XTmrCtr_SetLoadReg(XPAR_TMRCTR_0_BASEADDR, 1, 0);
+					XTmrCtr_SetControlStatusReg(XPAR_TMRCTR_0_BASEADDR, 1, XTC_CSR_LOAD_MASK);
+					XTmrCtr_SetControlStatusReg(XPAR_TMRCTR_0_BASEADDR, 1,	XTC_CSR_ENABLE_TMR_MASK);
+					if(milisec == 10){
+						milisec = 0;
+						sec++;
+					}
+					if(sec == 10){
+						sec = 0;
+						sectwo++;
+					}
+					if(sectwo == 10){
+						sectwo = 0;
+						secthree++;
+		}
+					if(secthree == 10){
+						secthree = 0;
+						secfour++;
+					}
+					if(secfour == 10){
+						secfour = 0;
 
-
-	}
-}
+					}
+		}
 	}
 	return 0;
 }
 
-void allMightyDetector(int miliseconds, int seconds, int sectwo){
-						if(miliseconds == 0){
-							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101111000000);
-						}
-						if(miliseconds == 1){
-							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101111111001);
-						}
-						if(miliseconds == 2){
-							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101110100100);
-						}
-						if(miliseconds == 3){
-							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101110110000);
-						}
-						if(miliseconds == 4){
-							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101110011001);
-						}
-						if(miliseconds == 5){
-							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101110010010);
-						}
-						if(miliseconds == 6){
-							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101110000010);
-						}
-						if(miliseconds == 7){
-							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101111111000);
-						}
-						if(miliseconds == 8){
-							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101110000000);
-						}
-						if(miliseconds == 9){
-							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101110011000);
-						}
+void IntrHandler(void *baseaddr_p){
+
+	Xuint32 btnvalue = XGpio_DiscreteRead(&Gpio, 1);
+		if(btnvalue == 0x01){
+			reset();
+		}
+}
+
+
+void reset(){
+	milisec = 0;
+	sec = 0;
+	sectwo = 0;
+	secthree = 0;
+	secfour = 0;
+}
+
+
+
+void milisecDetector(int miliseconds){
+							if(miliseconds == 0){
+								SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111001111000000);
+							}
+							if(miliseconds == 1){
+								SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111001111111001);
+							}
+							if(miliseconds == 2){
+								SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111001110100100);
+							}
+							if(miliseconds == 3){
+								SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101110110000);
+							}
+							if(miliseconds == 4){
+								SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101110011001);
+							}
+							if(miliseconds == 5){
+								SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101110010010);
+							}
+							if(miliseconds == 6){
+								//xil_printf("We in the loop \n");
+								SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101110000010);
+							}
+							if(miliseconds == 7){
+								SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101111111000);
+							}
+							if(miliseconds == 8){
+								SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101110000000);
+							}
+							if(miliseconds == 9){
+								SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101110011000);
+							}
+
+
+
+
+	}
+
+void secondDetector(int seconds){
+							if(seconds == 0){
+										SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111001111000000);
+
+													}
+													if(seconds == 1){
+														SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111001111111001);
+
+													}
+													if(seconds == 2){
+														SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111011110100100);
+
+													}
+													if(seconds == 3){
+														SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111011110110000);
+
+													}
+													if(seconds == 4){
+														SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111011110011001);
+
+													}
+													if(seconds == 5){
+														//xil_printf("We in the loop \n");
+														SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111011110010010);
+
+													}
+													if(seconds == 6){
+														SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111011110000010);
+
+													}
+													if(seconds == 7){
+														SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111011111111000);
+
+													}
+													if(seconds == 8){
+														SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111011110000000);
+
+													}
+													if(seconds == 9){
+														SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111011110011000);
+
+													}
+
+}
+
+
+
+
+
+
+void allMightyDetector(int miliseconds, int seconds, int sectwo, int secthree, int secfour){
+						//xil_printf("%d.%d\n", seconds, miliseconds);
+						//xil_printf("seconds: %d\n", seconds);
+
+
 						if(seconds == 0){
 							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111011111000000);
 
@@ -154,10 +257,142 @@ void allMightyDetector(int miliseconds, int seconds, int sectwo){
 							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111011110011000);
 
 						}
-						XTmrCtr_SetControlStatusReg(XPAR_TMRCTR_0_BASEADDR, 1, 0);
-						XTmrCtr_SetLoadReg(XPAR_TMRCTR_0_BASEADDR, 1, 0);
-						XTmrCtr_SetControlStatusReg(XPAR_TMRCTR_0_BASEADDR, 1, XTC_CSR_LOAD_MASK);
-						XTmrCtr_SetControlStatusReg(XPAR_TMRCTR_0_BASEADDR, 1,	XTC_CSR_ENABLE_TMR_MASK);
+						if(miliseconds == 0){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101111000000);
+
+						}
+						if(miliseconds == 1){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101111111001);
+						}
+						if(miliseconds == 2){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101110100100);
+						}
+						if(miliseconds == 3){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101110110000);
+						}
+						if(miliseconds == 4){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101110011001);
+						}
+						if(miliseconds == 5){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101110010010);
+						}
+						if(miliseconds == 6){
+							//xil_printf("We in the loop \n");
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101110000010);
+						}
+						if(miliseconds == 7){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101111111000);
+						}
+						if(miliseconds == 8){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101110000000);
+						}
+						if(miliseconds == 9){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101110011000);
+						}
+						if(miliseconds == 0){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1111101111000000);
+
+						}
+						if(sectwo == 0){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1110111111000000);
+
+						}
+						if(sectwo == 1){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1110111111111001);
+						}
+						if(sectwo == 2){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1110111110100100);
+						}
+						if(sectwo == 3){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1110111110110000);
+						}
+						if(sectwo == 4){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1110111110011001);
+						}
+						if(sectwo == 5){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1110111110010010);
+						}
+						if(sectwo == 6){
+							//xil_printf("We in the loop \n");
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1110111110000010);
+						}
+						if(sectwo == 7){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1110111111111000);
+						}
+						if(sectwo == 8){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1110111110000000);
+						}
+						if(sectwo == 9){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1110111110011000);
+						}
+						if(secthree == 0){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1101111111000000);
+
+						}
+						if(secthree == 1){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1101111111111001);
+						}
+						if(secthree == 2){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1101111110100100);
+						}
+						if(secthree == 3){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1101111110110000);
+						}
+						if(secthree == 4){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1101111110011001);
+						}
+						if(secthree == 5){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1101111110010010);
+						}
+						if(secthree == 6){
+							//xil_printf("We in the loop \n");
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1101111110000010);
+						}
+						if(secthree == 7){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1101111111111000);
+						}
+						if(secthree == 8){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1101111110000000);
+						}
+						if(secthree == 9){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1101111110011000);
+						}
+						if(secfour == 0){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1011111111000000);
+
+						}
+						if(secfour == 1){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1011111111111001);
+						}
+						if(secfour == 2){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1011111110100100);
+						}
+						if(secfour == 3){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1011111110110000);
+						}
+						if(secfour == 4){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1011111110011001);
+						}
+						if(secfour == 5){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1011111110010010);
+						}
+						if(secfour == 6){
+							//xil_printf("We in the loop \n");
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1011111110000010);
+						}
+						if(secfour == 7){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1011111111111000);
+						}
+						if(secfour == 8){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1011111110000000);
+						}
+						if(secfour == 9){
+							SEVENSEG_mWriteReg(XPAR_SEVENSEG_0_S00_AXI_BASEADDR, 0, 0b1011111110011000);
+						}
+						//XTmrCtr_SetControlStatusReg(XPAR_TMRCTR_0_BASEADDR, 1, 0);
+						//XTmrCtr_SetLoadReg(XPAR_TMRCTR_0_BASEADDR, 1, 0);
+						//XTmrCtr_SetControlStatusReg(XPAR_TMRCTR_0_BASEADDR, 1, XTC_CSR_LOAD_MASK);
+						//XTmrCtr_SetControlStatusReg(XPAR_TMRCTR_0_BASEADDR, 1,	XTC_CSR_ENABLE_TMR_MASK);
 
 
 
@@ -825,3 +1060,4 @@ if(seconds == 9){
 	XTmrCtr_SetControlStatusReg(XPAR_TMRCTR_0_BASEADDR, 1,	XTC_CSR_ENABLE_TMR_MASK);
 }
 */
+
